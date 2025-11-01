@@ -1,17 +1,23 @@
-import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
 
-export async function POST(_: Request, { params }: { params: { id: string } }) {
-  const { id } = await params
+export async function POST(
+  request: Request,
+  props: { params: Promise<{ id: string }> }
+) {
+  const { id } = await props.params
   const session = await auth()
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  
+  if (!session?.user?.id)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const original = await prisma.project.findFirst({
-    where: { id: id, userId: session.user.id },
+    where: { id, userId: session.user.id },
   })
-  
-  if (!original) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  if (!original)
+    return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   const copy = await prisma.project.create({
     data: {
@@ -23,5 +29,6 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
       userId: session.user.id,
     },
   })
+  
   return NextResponse.json(copy, { status: 201 })
 }

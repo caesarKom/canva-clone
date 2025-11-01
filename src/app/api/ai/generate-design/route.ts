@@ -40,14 +40,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to generate design' }, { status: 500 })
     }
 
-    // Opcjonalnie: walidacja JSON
-    // let canvasData
-    // try {
-    //   canvasData = JSON.parse(canvasDataText)
-    // } catch (e) {
-    //   return NextResponse.json({ error: 'Invalid JSON returned from AI' }, { status: 500 })
-    // }
-
     return NextResponse.json({ canvasDataText: canvasDataText })
   } catch (error) {
     console.error('AI generation error:', error)

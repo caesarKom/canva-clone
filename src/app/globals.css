@@ -120,6 +120,12 @@
     @apply bg-background text-foreground;
   }
 }
+@layer base {
+  button:not([disabled]),
+  [role="button"]:not([disabled]) {
+    cursor: pointer;
+  }
+}
 
 /* Glow buttons */
 .transition-soft {
@@ -153,17 +159,17 @@
 
 /* Custom scrollbar */
 .overflow-y-auto::-webkit-scrollbar {
-  width: 8px;
+  width: 0px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-track {
   background: #f1f1f1;
-  border-radius: 4px;
+  border-radius: 0px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
   background: #a3a2a2;
-  border-radius: 4px;
+  border-radius: 0px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
