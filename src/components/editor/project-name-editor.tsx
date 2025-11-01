@@ -28,17 +28,9 @@ export function ProjectNameEditor({ initialName, projectId, onNameChange }: Proj
 
     setIsSaving(true)
     try {
-      const res = await fetch(`/api/project/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name: name.trim() }),
-      })
-
-      if (res.ok) {
         onNameChange?.(name.trim())
         setIsEditing(false)
-      }
+
     } catch (error) {
       console.error('Failed to update project name:', error)
     } finally {

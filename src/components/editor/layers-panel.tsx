@@ -1,81 +1,65 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { Canvas, FabricObject, util } from 'fabric'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Eye, EyeOff, Lock, Unlock, Trash2, Copy } from 'lucide-react'
+import { FabricObject } from "fabric"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Eye, EyeOff, Lock, Unlock, Trash2, Copy } from "lucide-react"
+import { useEditorStore } from "@/stores/editor-store"
 
-interface LayersPanelProps {
-  canvas: Canvas | null
-  selectedObject: FabricObject | null
-  onSelectObject: (obj: FabricObject) => void
-}
-
-export function LayersPanel({ canvas, selectedObject, onSelectObject }: LayersPanelProps) {
-  const [objects, setObjects] = useState<FabricObject[]>([])
-
-  useEffect(() => {
-    if (!canvas) return
-
-    const updateObjects = () => {
-      const canvasObjects = canvas.getObjects()
-      setObjects([...canvasObjects].reverse()) // Reverse to show top objects first
-    }
-
-    updateObjects()
-
-    canvas.on('object:added', updateObjects)
-    canvas.on('object:removed', updateObjects)
-    canvas.on('object:modified', updateObjects)
-
-    return () => {
-      canvas.off('object:added', updateObjects)
-      canvas.off('object:removed', updateObjects)
-      canvas.off('object:modified', updateObjects)
-    }
-  }, [canvas])
+export function LayersPanel() {
+  const {
+    canvas,
+    selectedObject,
+    canvasObjects = [],
+    setSelectedObject,
+    updateCanvasObjects,
+  } = useEditorStore()
 
   const getObjectName = (obj: FabricObject) => {
-    if (obj.type === 'i-text' || obj.type === 'text') {
-      const text = (obj as any).text || ''
-      return `Text: ${text.substring(0, 20)}${text.length > 20 ? '...' : ''}`
+    if (obj.type === "i-text" || obj.type === "text") {
+      const text = (obj as any).text || ""
+      return `Text: ${text.substring(0, 20)}${text.length > 20 ? "..." : ""}`
     }
-    return `${obj.type?.charAt(0).toUpperCase()}${obj.type?.slice(1)}` || 'Object'
+    return (
+      `${obj.type?.charAt(0).toUpperCase()}${obj.type?.slice(1)}` || "Object"
+    )
   }
 
   const handleSelectObject = (obj: FabricObject) => {
-    if (canvas) {
-      canvas.setActiveObject(obj)
-      canvas.renderAll()
-      onSelectObject(obj)
-    }
+    setSelectedObject(obj)
   }
 
-  const handleToggleVisibility = (obj: FabricObject) => {
+  const handleToggleVisibility = (obj: FabricObject, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!canvas) return
+
     obj.visible = !obj.visible
-    canvas?.renderAll()
-    setObjects([...objects])
+    canvas.renderAll()
+    updateCanvasObjects()
   }
 
-  const handleToggleLock = (obj: FabricObject) => {
+  const handleToggleLock = (obj: FabricObject, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!canvas) return
+
     obj.selectable = !obj.selectable
     obj.evented = !obj.evented
-    canvas?.renderAll()
-    setObjects([...objects])
+    canvas.renderAll()
+    updateCanvasObjects()
   }
 
-  const handleDeleteObject = (obj: FabricObject) => {
-    if (canvas) {
-      canvas.remove(obj)
-      canvas.renderAll()
-    }
+  const handleDeleteObject = (obj: FabricObject, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!canvas) return
+
+    canvas.remove(obj)
+    canvas.renderAll()
   }
 
   const handleDuplicateObject = (obj: FabricObject, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!canvas) return
-    
+
     canvas.setActiveObject(obj)
     obj.clone().then((cloned: FabricObject) => {
       cloned.set({
@@ -87,49 +71,60 @@ export function LayersPanel({ canvas, selectedObject, onSelectObject }: LayersPa
       canvas.renderAll()
     })
   }
- 
 
-  const handleMoveLayer = (obj: FabricObject, direction: 'up' | 'down' | 'top' | 'bottom') => {
+  const handleMoveLayer = (
+    obj: FabricObject,
+    direction: "up" | "down" | "top" | "bottom"
+  ) => {
     if (!canvas) return
 
     switch (direction) {
-      case 'up':
+      case "up":
         canvas.bringObjectForward(obj)
         break
-      case 'down':
+      case "down":
         canvas.sendObjectBackwards(obj)
         break
-      case 'top':
+      case "top":
         canvas.bringObjectToFront(obj)
         break
-      case 'bottom':
+      case "bottom":
         canvas.sendObjectToBack(obj)
         break
     }
 
     canvas.renderAll()
-    setObjects([...canvas.getObjects()].reverse())
+    updateCanvasObjects()
   }
+
+  // Reverse array for display (top objects first)
+  const displayObjects = [...canvasObjects].reverse()
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b">
+      <div className="p-4 border-b flex-shrink-0">
         <h3 className="font-semibold text-sm">Layers</h3>
-        <p className="text-xs text-gray-500 mt-1">{objects.length} objects</p>
+        <p className="text-xs text-gray-500 mt-1">
+          {canvasObjects.length} objects
+        </p>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ 
+          minHeight: 0, // Important for flex children
+          maxHeight: '100%' 
+        }}>
+        
         <div className="p-2 space-y-1">
-          {objects.length === 0 ? (
+          {canvasObjects.length === 0 ? (
             <div className="text-center py-8 text-sm text-gray-500">
               No objects on canvas
             </div>
           ) : (
-            objects.map((obj, index) => (
+            displayObjects.map((obj, index) => (
               <div
                 key={index}
-                className={`group flex items-center gap-2 p-2 rounded hover:bg-gray-100 cursor-pointer ${
-                  selectedObject === obj ? 'bg-blue-50 hover:bg-blue-100' : ''
+                className={`group flex items-center gap-2 p-2 rounded hover:bg-gray-100 cursor-pointer transition-colors ${
+                  selectedObject === obj ? "bg-blue-50 hover:bg-blue-100 ring-2 ring-blue-200" : ""
                 }`}
                 onClick={() => handleSelectObject(obj)}
               >
@@ -148,8 +143,7 @@ export function LayersPanel({ canvas, selectedObject, onSelectObject }: LayersPa
                     size="icon"
                     className="h-6 w-6"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      handleToggleVisibility(obj)
+                      handleToggleVisibility(obj, e)
                     }}
                   >
                     {obj.visible ? (
@@ -163,8 +157,7 @@ export function LayersPanel({ canvas, selectedObject, onSelectObject }: LayersPa
                     size="icon"
                     className="h-6 w-6"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      handleToggleLock(obj)
+                      handleToggleLock(obj, e)
                     }}
                   >
                     {obj.selectable ? (
@@ -188,8 +181,7 @@ export function LayersPanel({ canvas, selectedObject, onSelectObject }: LayersPa
                     size="icon"
                     className="h-6 w-6 text-red-600"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteObject(obj)
+                      handleDeleteObject(obj, e)
                     }}
                   >
                     <Trash2 className="h-3 w-3" />
@@ -199,7 +191,7 @@ export function LayersPanel({ canvas, selectedObject, onSelectObject }: LayersPa
             ))
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {selectedObject && (
         <div className="p-2 border-t">
@@ -209,7 +201,7 @@ export function LayersPanel({ canvas, selectedObject, onSelectObject }: LayersPa
               variant="outline"
               size="sm"
               className="text-xs"
-              onClick={() => handleMoveLayer(selectedObject, 'top')}
+              onClick={() => handleMoveLayer(selectedObject, "top")}
             >
               Front
             </Button>
@@ -217,7 +209,7 @@ export function LayersPanel({ canvas, selectedObject, onSelectObject }: LayersPa
               variant="outline"
               size="sm"
               className="text-xs"
-              onClick={() => handleMoveLayer(selectedObject, 'up')}
+              onClick={() => handleMoveLayer(selectedObject, "up")}
             >
               Up
             </Button>
@@ -225,7 +217,7 @@ export function LayersPanel({ canvas, selectedObject, onSelectObject }: LayersPa
               variant="outline"
               size="sm"
               className="text-xs"
-              onClick={() => handleMoveLayer(selectedObject, 'down')}
+              onClick={() => handleMoveLayer(selectedObject, "down")}
             >
               Down
             </Button>
@@ -233,8 +225,7 @@ export function LayersPanel({ canvas, selectedObject, onSelectObject }: LayersPa
               variant="outline"
               size="sm"
               className="text-xs"
-              onClick={() => handleMoveLayer(selectedObject, 'bottom')}
-              
+              onClick={() => handleMoveLayer(selectedObject, "bottom")}
             >
               Back
             </Button>

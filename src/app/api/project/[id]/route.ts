@@ -19,49 +19,6 @@ export async function DELETE(
   return NextResponse.json({ success: true })
 }
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const { id } = await params
-  const session = await auth()
-  if (!session?.user?.id)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const body = await req.json()
-
-  if (!body.canvasData || !body.thumbnail || !body.width || !body.height) {
- 
-    await prisma.project.update({
-      where: { id: id, userId: session.user.id },
-      data: {
-        name: body.name,
-      },
-    })
-
-    return NextResponse.json({ success: true })
-
-  } else {
-
-    const updated = await prisma.project.updateMany({
-      where: { id: id, userId: session.user.id },
-      data: {
-        name: body.name,
-        canvasData: body.canvasData,
-        thumbnail: body.thumbnail,
-        animations: body.animations,
-        width: body.width,
-        height: body.height,
-      },
-    })
-
-    if (updated.count === 0) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 })
-    }
-    return NextResponse.json({ success: true })
-  }
-}
-
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   const { id } = await params
   const session = await auth()
@@ -78,3 +35,62 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 }
 
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const { id } = await params
+  try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+
+    const updateData: any = {}
+    
+    if (body.name !== undefined) {
+      updateData.name = body.name
+    }
+    
+    if (body.width !== undefined) {
+      updateData.width = body.width
+    }
+    
+    if (body.height !== undefined) {
+      updateData.height = body.height
+    }
+    
+    if (body.canvasData !== undefined && body.canvasData !== null) {
+      updateData.canvasData = body.canvasData
+     // console.log('✅ Updating canvasData')
+    }
+    
+    if (body.thumbnail !== undefined) {
+      updateData.thumbnail = body.thumbnail
+    }
+    
+    if (body.animations !== undefined) {
+      updateData.animations = body.animations
+    }
+
+    //console.log('Updating with:', Object.keys(updateData))
+
+    const project = await prisma.project.update({
+      where: {
+        id: id,
+        userId: session.user.id,
+      },
+      data: updateData,
+    })
+    
+    return NextResponse.json(project)
+  } catch (error) {
+    console.error('❌ API PATCH error:', error)
+    return NextResponse.json(
+      { error: 'Failed to update project' },
+      { status: 500 }
+    )
+  }
+}

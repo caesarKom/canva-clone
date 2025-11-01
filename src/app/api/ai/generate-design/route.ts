@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { GoogleGenAI } from "@google/genai";
 import { auth } from '@/lib/auth'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,33 +17,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
-    // Użyj GPT-4 do wygenerowania struktury designu
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a design assistant that creates Fabric.js canvas JSON structures. 
+    const completion = await ai.models.generateContent({
+      model: "gemini-2.5-pro",
+      contents: [
+        
+         `You are a design assistant that creates Fabric.js canvas JSON structures. 
           Generate a complete design based on the user's description. 
           Return only valid JSON that can be loaded into Fabric.js canvas.
           Include objects like rectangles, circles, text, and their properties (position, size, colors, etc.).`,
-        },
-        {
-          role: 'user',
-          content: `Create a ${templateType || 'design'} with the following description: ${prompt}`,
-        },
+     
+          `Create a ${templateType || 'design'} with the following description: ${prompt}`,
+      
       ],
-      temperature: 0.7,
-      max_tokens: 2000,
+       config: {
+        responseMimeType: 'application/json',
+      },
     })
 
-    const canvasData = completion.choices[0]?.message?.content
+    const canvasDataText = completion.text
 
-    if (!canvasData) {
+    if (!canvasDataText) {
       return NextResponse.json({ error: 'Failed to generate design' }, { status: 500 })
     }
 
-    return NextResponse.json({ canvasData })
+    // Opcjonalnie: walidacja JSON
+    // let canvasData
+    // try {
+    //   canvasData = JSON.parse(canvasDataText)
+    // } catch (e) {
+    //   return NextResponse.json({ error: 'Invalid JSON returned from AI' }, { status: 500 })
+    // }
+
+    return NextResponse.json({ canvasDataText: canvasDataText })
   } catch (error) {
     console.error('AI generation error:', error)
     return NextResponse.json(

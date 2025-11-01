@@ -7,11 +7,11 @@ import {
   Circle,
   Triangle,
   IText,
-  Line,
   FabricImage,
   ActiveSelection,
   FabricObject,
   Group,
+  Path,
 } from "fabric"
 
 export const initializeFabric = (
@@ -20,7 +20,6 @@ export const initializeFabric = (
   height: number = 600
 ): Canvas | null => {
   if (!canvasRef.current) return null
-console.log('🔧 Creating Fabric canvas:', width, height) // ✅ Debug
   const canvas = new Canvas(canvasRef.current, {
     width,
     height,
@@ -80,6 +79,48 @@ export const addTriangle = (canvas: Canvas) => {
   canvas.renderAll()
 }
 
+export const addStar = (canvas: Canvas) => {
+  const star = new Path(
+    "M12 2 L15 8 L22 9 L17 14 L18 21 L12 18 L6 21 L7 14 L2 9 L9 8 Z",
+    { left: 90, top: 80, fill: "#fbbf24", scaleX: 4, scaleY: 4 }
+  )
+  canvas.add(star)
+  canvas.setActiveObject(star)
+  canvas.renderAll()
+}
+
+export const addArrow = (canvas: Canvas) => {
+  const arrow = new Path("M2 12h14M12 6l6 6-6 6", {
+    left: 100,
+    top: 170,
+    fill: "",
+    stroke: "#2563eb",
+    strokeWidth: 6,
+    scaleX: 3,
+    scaleY: 3,
+  })
+  canvas.add(arrow)
+  canvas.setActiveObject(arrow)
+  canvas.renderAll()
+}
+
+export const addCheck = (canvas: Canvas) => {
+  const check = new Path("M5 13l4 4L19 7", {
+    left: 80,
+    top: 240,
+    fill: "",
+    stroke: "#10b981",
+    strokeWidth: 8,
+    scaleX: 4,
+    scaleY: 4,
+    strokeLineCap: "round",
+    strokeLineJoin: "round",
+  })
+  canvas.add(check)
+  canvas.setActiveObject(check)
+  canvas.renderAll()
+}
+
 export const addText = (canvas: Canvas, text: string = "Add a heading") => {
   const textObject = new IText(text, {
     left: 100,
@@ -133,71 +174,53 @@ export const changeColor = (canvas: Canvas, color: string) => {
 }
 
 export const exportToJSON = (canvas: Canvas): string => {
-  const json = canvas.toJSON()
-  
-  const data = {
-    ...json,
-    width: canvas.width,
-    height: canvas.height,
+  try {
+    const json = canvas.toJSON()
+
+    const data = {
+      ...json,
+      width: canvas.width,
+      height: canvas.height,
+    }
+
+    const result = JSON.stringify(data)
+
+    return result
+  } catch (error) {
+    console.error("❌ Error in exportToJSON:", error)
+    return "{}"
   }
-  console.log('💾 Exporting canvas with dimensions:', data.width, data.height)
-  return JSON.stringify(data)
 }
 
-export const loadFromJSON = async (canvas: Canvas, jsonData: string): Promise<boolean> => {
-  if (!canvas) {
-    console.error('❌ Canvas is null')
-    return false
-  }
+export const loadFromJSON = async (canvas: Canvas, jsonData: string | object): Promise<boolean> => {
+  if (!canvas) return false
 
   try {
-    const data = JSON.parse(jsonData)
-    
-    // Zachowaj wymiary
+    const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData
+
     const targetWidth = canvas.width || 800
     const targetHeight = canvas.height || 600
-    
-    console.log('📦 Loading canvas data...')
-    
-    // Usuń wymiary z JSON
+
     delete data.width
     delete data.height
-    
-    // Sprawdź czy canvas element istnieje
+
     const canvasElement = canvas.getElement()
     if (!canvasElement) {
-      console.warn('⚠️ Canvas element not ready, retrying...')
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise((resolve) => setTimeout(resolve, 100))
       return loadFromJSON(canvas, jsonData)
     }
-    
-    try {
-      // Załaduj dane
-      await canvas.loadFromJSON(data)
-      
-      console.log('✅ JSON loaded successfully')
-      
-      // Przywróć wymiary
-      canvas.set({ width: targetWidth, height: targetHeight })
-      
-      if (canvasElement) {
-        canvasElement.width = targetWidth
-        canvasElement.height = targetHeight
-      }
-      
-      canvas.renderAll()
-      
-      console.log('✅ Canvas ready:', canvas.width, 'x', canvas.height)
-      
-      return true
-      
-    } catch (loadError) {
-      console.error('❌ Error loading JSON into canvas:', loadError)
-      return false
-    }
-    
-  } catch (parseError) {
-    console.error('❌ Error parsing JSON:', parseError)
+
+    await canvas.loadFromJSON(data)
+    canvas.set({ width: targetWidth, height: targetHeight })
+
+    canvasElement.width = targetWidth
+    canvasElement.height = targetHeight
+
+    canvas.renderAll()
+
+    return true
+  } catch (err) {
+    console.error('❌ Error loading JSON into canvas:', err)
     return false
   }
 }
@@ -206,14 +229,17 @@ export const exportToPNG = (canvas: Canvas): string => {
   return canvas.toDataURL({
     format: "png",
     quality: 1,
-    multiplier: 1
+    multiplier: 1,
   })
 }
 
 // Optional: function to export in higher resolution
-export const exportToHighResPNG = (canvas: Canvas, scale: number = 2): string => {
+export const exportToHighResPNG = (
+  canvas: Canvas,
+  scale: number = 2
+): string => {
   return canvas.toDataURL({
-    format: 'png',
+    format: "png",
     quality: 1,
     multiplier: scale, // 2 = 2x resolution, 3 = 3x itd.
   })
@@ -222,46 +248,46 @@ export const exportToHighResPNG = (canvas: Canvas, scale: number = 2): string =>
 // Group objects
 export const groupObjects = (canvas: Canvas) => {
   const activeSelection = canvas.getActiveObject()
-  
+
   if (!activeSelection) {
-    console.log('No object selected')
+    console.log("No object selected")
     return
   }
 
-  // Sprawdź czy to multiple selection
-  if (activeSelection.type === 'activeSelection') {
+  // Check if it's multiple selection
+  if (activeSelection.type === "activeSelection") {
     const selection = activeSelection as ActiveSelection
     const selectedObjects = selection.getObjects()
-    
-    // Usuń active selection
+
+    // Delete active selection
     canvas.discardActiveObject()
-    
-    // Stwórz grupę z wybranych obiektów
+
+    // Create a group of selected objects
     const group = new Group(selectedObjects, {
       left: activeSelection.left,
       top: activeSelection.top,
     })
-    
-    // Usuń oryginalne obiekty
-    selectedObjects.forEach(obj => canvas.remove(obj))
-    
-    // Dodaj grupę
+
+    // Delete original objects
+    selectedObjects.forEach((obj) => canvas.remove(obj))
+
+    // Add Group
     canvas.add(group)
     canvas.setActiveObject(group)
     canvas.renderAll()
-    
-    console.log('Objects grouped successfully')
+
+    console.log("Objects grouped successfully")
   } else {
-    console.log('Select multiple objects to group')
+    console.log("Select multiple objects to group")
   }
 }
 
 // Ungroup objects
 export const ungroupObjects = (canvas: Canvas) => {
   const activeObject = canvas.getActiveObject()
-  
-  if (!activeObject || activeObject.type !== 'group') {
-    console.log('Select a group to ungroup')
+
+  if (!activeObject || activeObject.type !== "group") {
+    console.log("Select a group to ungroup")
     return
   }
 
@@ -270,25 +296,24 @@ export const ungroupObjects = (canvas: Canvas) => {
 
   canvas.remove(group)
 
-  items.forEach(item => {
+  items.forEach((item) => {
     const left = (group.left || 0) + (item.left || 0)
     const top = (group.top || 0) + (item.top || 0)
-    
+
     item.set({
       left: left,
       top: top,
     })
-    
+
     canvas.add(item)
   })
-  
+
   const selection = new ActiveSelection(items, { canvas })
   canvas.setActiveObject(selection)
   canvas.renderAll()
-  
-  console.log('Group ungrouped successfully')
-}
 
+  console.log("Group ungrouped successfully")
+}
 
 // Bring to front
 export const bringToFront = (canvas: Canvas) => {
@@ -343,7 +368,10 @@ export const duplicateObject = (canvas: Canvas) => {
 }
 
 // Align objects
-export const alignObjects = (canvas: Canvas, alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => {
+export const alignObjects = (
+  canvas: Canvas,
+  alignment: "left" | "center" | "right" | "top" | "middle" | "bottom"
+) => {
   const activeObject = canvas.getActiveObject()
   if (!activeObject) return
 
@@ -351,22 +379,22 @@ export const alignObjects = (canvas: Canvas, alignment: 'left' | 'center' | 'rig
   const canvasHeight = canvas.height || 600
 
   switch (alignment) {
-    case 'left':
+    case "left":
       activeObject.set({ left: 0 })
       break
-    case 'center':
+    case "center":
       activeObject.set({ left: (canvasWidth - (activeObject.width || 0)) / 2 })
       break
-    case 'right':
+    case "right":
       activeObject.set({ left: canvasWidth - (activeObject.width || 0) })
       break
-    case 'top':
+    case "top":
       activeObject.set({ top: 0 })
       break
-    case 'middle':
+    case "middle":
       activeObject.set({ top: (canvasHeight - (activeObject.height || 0)) / 2 })
       break
-    case 'bottom':
+    case "bottom":
       activeObject.set({ top: canvasHeight - (activeObject.height || 0) })
       break
   }
@@ -408,12 +436,13 @@ export const animateObjectSmooth = (
     const progress = Math.min(elapsed / duration, 1)
 
     // Easing function (ease-in-out cubic)
-    const easedProgress = progress < 0.5
-      ? 4 * progress * progress * progress
-      : 1 - Math.pow(-2 * progress + 2, 3) / 2
+    const easedProgress =
+      progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2
 
-    const currentValue = startValue + (diff * easedProgress)
-    
+    const currentValue = startValue + diff * easedProgress
+
     obj.set(property as any, currentValue)
     canvas.renderAll()
 
@@ -440,8 +469,8 @@ export const animateObjectMultiple = (
   const startValues: Record<string, number> = {}
   const diffs: Record<string, number> = {}
 
-  // Przygotuj wartości startowe
-  Object.keys(animations).forEach(key => {
+  // Prepare starting values
+  Object.keys(animations).forEach((key) => {
     startValues[key] = (obj as any)[key] || 0
     diffs[key] = animations[key] - startValues[key]
   })
@@ -454,13 +483,14 @@ export const animateObjectMultiple = (
     const progress = Math.min(elapsed / duration, 1)
 
     // Easing
-    const easedProgress = progress < 0.5
-      ? 4 * progress * progress * progress
-      : 1 - Math.pow(-2 * progress + 2, 3) / 2
+    const easedProgress =
+      progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2
 
-    // Update wszystkich properties
-    Object.keys(animations).forEach(key => {
-      const currentValue = startValues[key] + (diffs[key] * easedProgress)
+    // Update all properties
+    Object.keys(animations).forEach((key) => {
+      const currentValue = startValues[key] + diffs[key] * easedProgress
       obj.set(key as any, currentValue)
     })
 
@@ -475,4 +505,3 @@ export const animateObjectMultiple = (
 
   requestAnimationFrame(step)
 }
-

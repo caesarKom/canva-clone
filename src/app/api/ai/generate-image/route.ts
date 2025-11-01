@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
-    // Użyj DALL-E 3 do wygenerowania obrazka
     const response = await openai.images.generate({
       model: 'dall-e-3',
       prompt: prompt,

@@ -20,17 +20,18 @@ import {
 import { Download, FileImage, FileType } from 'lucide-react'
 import { Canvas } from 'fabric'
 import jsPDF from 'jspdf'
+import { useEditorStore } from '@/stores/editor-store'
 
 interface ExportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  canvas: Canvas | null
   projectName: string
 }
 
 type ExportFormat = 'png' | 'jpg' | 'svg' | 'pdf' | 'json'
 
-export function ExportDialog({ open, onOpenChange, canvas, projectName }: ExportDialogProps) {
+export function ExportDialog({ open, onOpenChange, projectName }: ExportDialogProps) {
+  const { canvas } = useEditorStore()
   const [format, setFormat] = useState<ExportFormat>('png')
   const [quality, setQuality] = useState<number>(1)
 

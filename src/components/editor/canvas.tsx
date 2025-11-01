@@ -1,116 +1,180 @@
-'use client'
+"use client"
 
-import { useEffect, useRef, useCallback, useState } from 'react'
-import { Canvas } from 'fabric'
-import { initializeFabric, exportToJSON, loadFromJSON } from '@/lib/fabric-utils'
+import { useEffect, useRef, useCallback } from "react"
+import { Canvas } from "fabric"
+import {
+  initializeFabric,
+  exportToJSON,
+  loadFromJSON,
+} from "@/lib/fabric-utils"
+import { useEditorStore } from "@/stores/editor-store"
+import { Maximize2, ZoomIn, ZoomOut } from "lucide-react"
 
 interface CanvasEditorProps {
   projectId: string
   initialData?: string
-   width?: number 
-  height?: number
   onSave?: (data: string) => void
-  canvasRef?: React.RefObject<Canvas | null>
 }
 
-export function CanvasEditor({ projectId, initialData, onSave, canvasRef, width=800,height=600 }: CanvasEditorProps) {
+export function CanvasEditor({
+  initialData,
+  onSave,
+  projectId,
+}: CanvasEditorProps) {
   const localCanvasRef = useRef<HTMLCanvasElement>(null)
   const fabricRef = useRef<Canvas | null>(null)
-
   const containerRef = useRef<HTMLDivElement>(null)
-  const [zoom, setZoom] = useState(1)
+
+  const {
+    canvas,
+    zoom,
+    setZoom,
+    canvasWidth,
+    canvasHeight,
+    updateCanvasObjects,
+    saveToHistory,
+    autoSaveTime,
+  } = useEditorStore()
 
   const handleSave = useCallback(() => {
-  if (fabricRef.current && onSave) {
-    const data = exportToJSON(fabricRef.current)
-    console.log('Saving canvas data:', JSON.parse(data)) // ✅ Debug
-    onSave(data)
-  }
-}, [onSave])
+    if (fabricRef.current && onSave) {
+      const data = exportToJSON(fabricRef.current)
+      onSave(data)
+    }
+  }, [onSave])
 
   useEffect(() => {
-  if (!localCanvasRef.current) return;
-console.log('🎨 Initializing canvas with dimensions:', width, height) // ✅ Debug
-  const canvas = initializeFabric(localCanvasRef, width, height);
-  if (!canvas) return;
+    let interval: NodeJS.Timeout | undefined
 
-  fabricRef.current = canvas;
-  if (canvasRef) canvasRef.current = canvas;
+    if (autoSaveTime !== "OFF") {
+      const time = Number(autoSaveTime)
 
-  // 🔒 BLOCADE – Fabric dont clered after unmount
-  let alive = true;
-  const originalClear = canvas.clear.bind(canvas);
-  canvas.clear = function () {
-    if (!alive) return this; // ← not clear, no error
-    return originalClear();
-  };
+      interval = setInterval(() => {
+        handleSave()
+      }, time * 60_000)
+    } 
 
-  // ✅ Async initialization
-  const initializeCanvas = async () => {
-      await new Promise(resolve => setTimeout(resolve, 50))
-      
-      if (initialData && alive) {
+    return () => {
+      if (interval) {
+        clearInterval(interval)
+      }
+    }
+  }, [autoSaveTime, handleSave])
+
+  useEffect(() => {
+    if (!localCanvasRef.current) return
+
+    const fabricCanvas = initializeFabric(
+      localCanvasRef,
+      canvasWidth,
+      canvasHeight
+    )
+    if (!fabricCanvas) return
+
+    fabricRef.current = fabricCanvas
+
+    useEditorStore.getState().setCanvas(fabricCanvas)
+
+    let alive = true
+    const originalClear = fabricCanvas.clear.bind(fabricCanvas)
+    fabricCanvas.clear = function () {
+      if (!alive) return this
+      return originalClear()
+    }
+
+    // Load initial data
+    if (initialData) {
+      setTimeout(async () => {
+        if (!alive) return
+
         try {
-          console.log('📦 Loading initial data...')
-          await loadFromJSON(canvas, initialData)
+          await loadFromJSON(fabricCanvas, initialData)
+
+          setTimeout(() => {
+            if (alive) {
+              updateCanvasObjects()
+              saveToHistory()
+            }
+          }, 100)
         } catch (error) {
           console.error("Failed to load canvas data:", error)
         }
-      }
+      }, 100)
     }
 
-  initializeCanvas()
+    return () => {
+      alive = false
+      fabricCanvas.dispose()
+      useEditorStore.getState().setCanvas(null)
+      useEditorStore.getState().saveToHistory()
+      fabricRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId])
 
-  const interval = setInterval(handleSave, 60_000);
+    const handleZoomIn = () => setZoom(Math.min(zoom + 0.1, 2))
+  const handleZoomOut = () => setZoom(Math.max(zoom - 0.1, 0.1))
+  const handleZoomReset = () => setZoom(1)
 
-  return () => {
-    alive = false;          
-    clearInterval(interval);
-    canvas.dispose();   
-    if (canvasRef?.current) canvasRef.current = null;
-  };
-}, [initialData, handleSave, canvasRef, width, height]);
-
-// Auto-fit canvas to viewport
-  useEffect(() => {
-    if (!containerRef.current || !width || !height) return
+  const handleFitToScreen = () => {
+    if (!containerRef.current) return
 
     const container = containerRef.current
-    const containerWidth = container.clientWidth - 64 // padding
-    const containerHeight = container.clientHeight - 64
+    const containerWidth = container.clientWidth - 5
+    const containerHeight = container.clientHeight - 5
 
-    const scaleX = containerWidth / width
-    const scaleY = containerHeight / height
-    const autoZoom = Math.min(scaleX, scaleY, 1) // Max 100%
+    const scaleX = containerWidth / canvasWidth
+    const scaleY = containerHeight / canvasHeight
+    const fitZoom = Math.min(scaleX, scaleY, 1)
 
-    setZoom(autoZoom)
-  }, [width, height])
-
-  const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 0.1, 2))
+    setZoom(fitZoom)
   }
 
-  const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev - 0.1, 0.1))
-  }
+  // Auto-fit canvas to viewport
+  // useEffect(() => {
+  //   if (!containerRef.current || !canvasWidth || !canvasHeight) return
 
-  const handleZoomReset = () => {
-    setZoom(1)
-  }
+  //   const container = containerRef.current
+  //   const containerWidth = container.clientWidth - 64 // padding
+  //   const containerHeight = container.clientHeight - 64
+
+  //   const scaleX = containerWidth / canvasWidth
+  //   const scaleY = containerHeight / canvasHeight
+  //   const autoZoom = Math.min(scaleX, scaleY, 1) // Max 100%
+
+  //   setZoom(autoZoom)
+  // }, [canvasWidth, canvasHeight, setZoom])
+
+  useEffect(() => {
+    if (!fabricRef.current) return
+    
+    const canvas = fabricRef.current
+      canvas.setDimensions({ width: canvasWidth, height: canvasHeight })
+      const element = canvas.getElement()
+
+      if (element) {
+        element.width = canvasWidth
+        element.height = canvasHeight
+      }
+      canvas.renderAll()
+      handleFitToScreen()
+    
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasWidth, canvasHeight])
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="flex-1 bg-gray-100 overflow-auto relative"
     >
       {/* Scrollable canvas area */}
       <div className="min-h-full p-8 flex items-center justify-center">
-        <div 
+        <div
           className="shadow-2xl bg-white"
           style={{
             transform: `scale(${zoom})`,
-            transformOrigin: 'center center',
-            transition: 'transform 0.2s ease',
+            transformOrigin: "center center",
+            transition: "transform 0.2s ease",
           }}
         >
           <canvas ref={localCanvasRef} />
@@ -123,21 +187,33 @@ console.log('🎨 Initializing canvas with dimensions:', width, height) // ✅ D
         <div className="bg-white rounded shadow-lg p-2 flex flex-col gap-1">
           <button
             onClick={handleZoomIn}
-            className="p-2 hover:bg-gray-100 rounded text-sm font-medium"
+            className="p-2 hover:bg-gray-100 rounded transition-colors flex justify-center"
             title="Zoom In"
           >
-            +
+            <ZoomIn className="h-4 w-4" />
           </button>
-          <div className="text-xs text-center py-1 px-2 text-gray-600">
+          <div className="text-xs text-center py-1 px-2 text-gray-600 font-medium">
             {Math.round(zoom * 100)}%
           </div>
+
           <button
             onClick={handleZoomOut}
-            className="p-2 hover:bg-gray-100 rounded text-sm font-medium"
+            className="p-2 hover:bg-gray-100 rounded transition-colors flex justify-center"
             title="Zoom Out"
           >
-            −
+            <ZoomOut className="h-4 w-4" />
           </button>
+
+          <div className="border-t my-1" />
+
+          <button
+            onClick={handleFitToScreen}
+            className="p-2 hover:bg-gray-100 rounded transition-colors flex justify-center"
+            title="Fit to Screen"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+
           <button
             onClick={handleZoomReset}
             className="p-2 hover:bg-gray-100 rounded text-xs"
@@ -149,7 +225,10 @@ console.log('🎨 Initializing canvas with dimensions:', width, height) // ✅ D
 
         {/* Dimension indicator */}
         <div className="bg-white px-3 py-2 rounded shadow-lg text-xs text-gray-600">
-          {width} × {height}
+          {canvasWidth} × {canvasHeight}
+          <div className="text-gray-400 text-[10px] mt-0.5 text-center">
+            {canvas?.getObjects().length || 0} objects
+          </div>
         </div>
       </div>
     </div>

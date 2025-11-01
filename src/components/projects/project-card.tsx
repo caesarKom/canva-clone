@@ -84,11 +84,14 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <Link href={`/editor/${project.id}`}>
           <div className="aspect-video bg-gray-200 rounded-t-lg relative overflow-hidden">
             {project.thumbnail ? (
+              <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={project.thumbnail}
                 alt={project.name}
                 className="w-full h-full object-fill"
               />
+              </>
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-blue-100 to-purple-100" />
             )}

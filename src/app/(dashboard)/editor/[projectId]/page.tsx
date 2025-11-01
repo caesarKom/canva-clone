@@ -1,47 +1,45 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback } from "react"
+import { useEffect, useRef, useCallback } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
-import { Canvas, FabricImage, FabricObject } from "fabric"
+import { Canvas, FabricImage } from "fabric"
 import { CanvasEditor } from "@/components/editor/canvas"
 import { Toolbar } from "@/components/editor/toolbar"
 import { SidebarApp } from "@/components/editor/sidebar"
 import { PropertiesPanel } from "@/components/editor/properties-panel"
-import {
-  addRectangle,
-  addCircle,
-  addTriangle,
-  addText,
-  addImageFromFile,
-  deleteObject,
-  exportToJSON,
-  exportToPNG,
-  loadFromJSON,
-  groupObjects,
-  ungroupObjects,
-} from "@/lib/fabric-utils"
+import { exportToJSON, exportToPNG, loadFromJSON } from "@/lib/fabric-utils"
 import { toast } from "sonner"
 import { AIGenerateDialog } from "@/components/editor/ai-generate-dialog"
 import { templateData, TemplateId, templateList } from "@/lib/templates"
 import { ExportDialog } from "@/components/editor/export-dialog"
 import { ObjectAnimation } from "@/types/animation"
 import { Loading } from "@/components/loading"
+import { useEditorStore } from "@/stores/editor-store"
 
 export default function EditorPage() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
   const canvasRef = useRef<Canvas | null>(null)
-  const [selectedObject, setSelectedObject] = useState<FabricObject | null>(
-    null
-  )
-  const [project, setProject] = useState<any>(null)
 
-  const [showAIDesignDialog, setShowAIDesignDialog] = useState(false)
-  const [showAIImageDialog, setShowAIImageDialog] = useState(false)
-  const [showExportDialog, setShowExportDialog] = useState(false)
-  const [animations, setAnimations] = useState<ObjectAnimation[]>([])
-  // ✅ Use ref to prevent double calling
+  const {
+    canvas,
+    project,
+    animations,
+    showAIDesignDialog,
+    showAIImageDialog,
+    showExportDialog,
+    setProject,
+    updateProject,
+    setAnimations,
+    setShowAIDesignDialog,
+    setShowAIImageDialog,
+    setShowExportDialog,
+    markClean,
+    reset,
+    updateCanvasObjects,
+  } = useEditorStore()
+
   const isCreatingProject = useRef(false)
   const hasInitialized = useRef(false)
 
@@ -54,16 +52,16 @@ export default function EditorPage() {
         console.error("Failed to parse animations:", error)
       }
     }
-  }, [project])
+  }, [project, setAnimations])
 
   const createNewProject = useCallback(
     async (templateId?: TemplateId | null) => {
       if (isCreatingProject.current) return
       isCreatingProject.current = true
-      
-      const template = templateList.find(t => t.id === templateId)
-    const width = template?.width || 800
-    const height = template?.height || 600
+
+      const template = templateList.find((t) => t.id === templateId)
+      const width = template?.width || 800
+      const height = template?.height || 600
 
       try {
         // ✅ Get data if exists
@@ -90,10 +88,14 @@ export default function EditorPage() {
         setProject(data)
 
         // ✅ load template for canvas if exists
-        if (templateCanvasData && canvasRef.current) {
+        if (templateCanvasData && canvas) {
           setTimeout(() => {
-            if (canvasRef.current) {
-              loadFromJSON(canvasRef.current, templateCanvasData)
+            if (canvas) {
+              loadFromJSON(canvas, templateCanvasData)
+              // Force update objects list
+              setTimeout(() => {
+                updateCanvasObjects()
+              }, 200)
             }
           }, 500)
         }
@@ -109,7 +111,7 @@ export default function EditorPage() {
         isCreatingProject.current = false
       }
     },
-    [router]
+    [canvas, router, setProject, updateCanvasObjects]
   )
 
   const loadProject = useCallback(async () => {
@@ -121,74 +123,73 @@ export default function EditorPage() {
       if (!res.ok) throw new Error("Failed to load project")
 
       const data = await res.json()
-      setProject({ ...data, width: data.width, height: data.height })
+      setProject(data)
+
+      // Load animations
+      if (data.animations) {
+        try {
+          const parsedAnimations = JSON.parse(data.animations)
+          setAnimations(parsedAnimations)
+        } catch (error) {
+          console.error("Failed to parse animations:", error)
+        }
+      }
     } catch (error) {
       console.error("Error loading project:", error)
       toast.error("Failed to load project")
     }
-  }, [params.projectId])
-
-  useEffect(() => {
-    if (hasInitialized.current) return
-    hasInitialized.current = true
-
-    if (params.projectId === "new") {
-      // ✅ Verify is in URL
-      const templateId = searchParams.get("template") as TemplateId | null
-
-      createNewProject(templateId)
-    } else {
-      loadProject()
-    }
-  }, [createNewProject, loadProject, params.projectId, searchParams])
+  }, [params.projectId, setProject, setAnimations])
 
   const handleSave = useCallback(
     async (canvasData: string) => {
-      if (!project) return
+      if (!project || !canvasData) return
 
-      const thumbnail = canvasRef.current
-        ? exportToPNG(canvasRef.current)
-        : null
+      const canvas = useEditorStore.getState().canvas
+      const thumbnail = canvas ? exportToPNG(canvas) : null
+
+      const parsed = JSON.parse(canvasData)
 
       try {
-        await fetch(`/api/project/${project.id}`, {
+        const res = await fetch(`/api/project/${project.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            canvasData,
+            canvasData: canvasData,
             thumbnail,
             animations: JSON.stringify(animations),
-            width: project?.width,
-            height: project?.height,
+            width: parsed.width,
+            height: parsed.height,
           }),
         })
-        toast.success("Project Saved")
+
+        if (!res.ok) {
+          throw new Error("Failed to save project")
+        }
+
+        markClean()
+        toast.success("Project saved successfully")
       } catch (error) {
-        console.error("Error saving project:", error)
-        toast.error("Error saving project")
+        console.error("❌ Error saving project:", error)
+        toast.error("Failed to save project")
       }
     },
-    [animations, project]
+    [project, animations, markClean]
   )
+
+  const handleManualSave = useCallback(() => {
+    if (canvas) {
+      const data = exportToJSON(canvas)
+      handleSave(data)
+    } else {
+      console.error("Canvas not available for save!")
+      toast.error("Canvas not ready")
+    }
+  }, [canvas, handleSave])
 
   const handleExport = useCallback(() => {
     setShowExportDialog(true)
-  }, [])
-
-  const handleAddShape = useCallback((type: "rect" | "circle" | "triangle") => {
-    if (!canvasRef.current) return
-
-    if (type === "rect") addRectangle(canvasRef.current)
-    else if (type === "circle") addCircle(canvasRef.current)
-    else if (type === "triangle") addTriangle(canvasRef.current)
-  }, [])
-
-  const handleAddText = useCallback(() => {
-    if (canvasRef.current) {
-      addText(canvasRef.current)
-    }
-  }, [])
+  }, [setShowExportDialog])
 
   const handleSaveAnimations = useCallback(
     async (newAnimations: ObjectAnimation[]) => {
@@ -212,79 +213,50 @@ export default function EditorPage() {
         toast.error("Failed to save animations")
       }
     },
-    [project]
+    [project, setAnimations]
   )
 
-  const handleAddImage = useCallback((file: File) => {
-    if (canvasRef.current) {
-      addImageFromFile(canvasRef.current, file)
-    }
-  }, [])
-
-  const handleDelete = useCallback(() => {
-    if (canvasRef.current) {
-      deleteObject(canvasRef.current)
-    }
-  }, [])
-
-  const handleManualSave = useCallback(() => {
-    if (canvasRef.current) {
-      handleSave(exportToJSON(canvasRef.current))
-    }
-  }, [handleSave])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const handleSelectionCreated = (e: any) => {
-      setSelectedObject(e.selected?.[0] || null)
-    }
-
-    const handleSelectionUpdated = (e: any) => {
-      setSelectedObject(e.selected?.[0] || null)
-    }
-
-    const handleSelectionCleared = () => {
-      setSelectedObject(null)
-    }
-
-    canvas.on("selection:created", handleSelectionCreated)
-    canvas.on("selection:updated", handleSelectionUpdated)
-    canvas.on("selection:cleared", handleSelectionCleared)
-
-    return () => {
-      canvas.off("selection:created", handleSelectionCreated)
-      canvas.off("selection:updated", handleSelectionUpdated)
-      canvas.off("selection:cleared", handleSelectionCleared)
-    }
-  }, [])
-
   const handleGenerateWithAI = useCallback(async (prompt: string) => {
-    const loadingToast = toast.loading("AI is generating your design...")
-    try {
-      toast.info("This may take a moment")
+  const loadingToast = toast.loading("AI is generating your design...")
+  try {
+    toast.info("This may take a moment")
 
-      const res = await fetch("/api/ai/generate-design", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ prompt, templateType: "design" }),
-      })
+    const res = await fetch("/api/ai/generate-design", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ prompt, templateType: "design" }),
+    })
 
-      if (!res.ok) throw new Error("Generation failed")
+    if (!res.ok) throw new Error("Generation failed")
 
-      const { canvasData } = await res.json()
+    const data = await res.json()
 
-      if (canvasRef.current && canvasData) {
-        loadFromJSON(canvasRef.current, canvasData)
-        toast.success("Design generated successfully", { id: loadingToast })
-      }
-    } catch (error) {
-      console.error("AI generation error:", error)
-      toast.error("Failed to generate design", { id: loadingToast })
+    const canvasData = data.canvasDataText
+
+    console.log('canvasData:', canvasData, 'typeof:', typeof canvasData)
+
+    if (!canvasRef.current) throw new Error("canvasRef is not ready")
+
+    // Jeśli canvasData jest stringiem JSON => parsuj, jeśli obiektem - użyj bez parsowania
+    let parsedCanvasData
+    if (typeof canvasData === 'string') {
+      parsedCanvasData = JSON.parse(canvasData)
+    } else if (typeof canvasData === 'object' && canvasData !== null) {
+      parsedCanvasData = canvasData
+    } else {
+      throw new Error("Nieznany typ danych canvasData")
     }
-  }, [])
+
+    // Wywołaj ładowanie na canvasie z właściwym obiektem
+    await loadFromJSON(canvasRef.current, parsedCanvasData)
+
+    toast.success("Design generated successfully", { id: loadingToast })
+  } catch (error) {
+    console.error("AI generation error:", error)
+    toast.error("Failed to generate design", { id: loadingToast })
+  }
+}, [])
 
   const handleGenerateImage = useCallback(async (prompt: string) => {
     const loadingToast = toast.loading("AI is generating your image...")
@@ -319,47 +291,54 @@ export default function EditorPage() {
     }
   }, [])
 
-  const handleOpenTemplates = useCallback(() => {
-    router.push("/templates")
-  }, [router])
-
-  const handleGroup = useCallback(() => {
-    if (canvasRef.current) {
-      groupObjects(canvasRef.current)
-    }
-  }, [])
-
-  const handleUngroup = useCallback(() => {
-    if (canvasRef.current) {
-      ungroupObjects(canvasRef.current)
-    }
-  }, [])
-
-  const handleSelectFromLayers = useCallback((obj: FabricObject) => {
-    setSelectedObject(obj)
-  }, [])
-
-  const handleCanvasDimensionsChange = useCallback(
-    async (width: number, height: number) => {
+  const handleProjectNameChange = useCallback(
+    async (newName: string) => {
       if (!project) return
+
+      updateProject({ name: newName })
 
       try {
         await fetch(`/api/project/${project.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ width, height }),
+          body: JSON.stringify({ name: newName }),
         })
-
-        setProject({ ...project, width, height })
-        toast.success("Canvas size saved")
       } catch (error) {
-        console.error("Error saving dimensions:", error)
-        toast.error("Failed to save")
+        console.error("Error updating project name:", error)
+        toast.error("Failed to update project name")
       }
     },
-    [project]
+    [project, updateProject]
   )
+
+  // Initialize
+  useEffect(() => {
+    if (hasInitialized.current) return
+    hasInitialized.current = true
+
+    if (params.projectId === "new") {
+      // ✅ Verify is in URL
+      const templateId = searchParams.get("template") as TemplateId | null
+
+      createNewProject(templateId)
+    } else {
+      loadProject()
+    }
+
+    return () => {
+      reset()
+    }
+  }, [createNewProject, loadProject, params.projectId, reset, searchParams])
+
+  // ✅ Sync canvas from store to ref (for manual save)
+  useEffect(() => {
+    if (canvas) {
+      canvasRef.current = canvas
+    } else {
+      canvasRef.current = null
+    }
+  }, [canvas])
 
   return (
     <>
@@ -367,52 +346,26 @@ export default function EditorPage() {
         <Toolbar
           projectId={params.projectId as string}
           projectName={project?.name || "Untitled"}
-          onProjectNameChange={(newName) =>
-            setProject({ ...project, name: newName })
-          }
-          onAddRectangle={() => handleAddShape("rect")}
-          onAddCircle={() => handleAddShape("circle")}
-          onAddTriangle={() => handleAddShape("triangle")}
-          onAddText={handleAddText}
-          onDelete={handleDelete}
+          onProjectNameChange={handleProjectNameChange}
           onSave={handleManualSave}
           onExport={handleExport}
           onGenerateWithAI={() => setShowAIDesignDialog(true)}
           onGenerateImage={() => setShowAIImageDialog(true)}
-          onOpenTemplates={handleOpenTemplates}
-          onGroup={handleGroup}
-          onUngroup={handleUngroup}
         />
 
         <div className="flex-1 flex overflow-hidden">
-          <SidebarApp
-            canvas={canvasRef.current}
-            onAddShape={handleAddShape}
-            onAddText={handleAddText}
-            onAddImage={handleAddImage}
-          />
+          <SidebarApp />
 
           {project ? (
             <CanvasEditor
               projectId={params.projectId as string}
               initialData={project?.canvasData}
-              width={project?.width || 800}
-              height={project?.height || 600}
               onSave={handleSave}
-              canvasRef={canvasRef}
             />
           ) : (
             <Loading />
           )}
-          <PropertiesPanel
-            canvas={canvasRef.current}
-            selectedObject={selectedObject}
-            handleSaveAnimations={handleSaveAnimations}
-            animations={animations}
-            onSelectObject={handleSelectFromLayers}
-            project={project}
-            handleCanvasDimensionsChange={handleCanvasDimensionsChange}
-          />
+          <PropertiesPanel handleSaveAnimations={handleSaveAnimations} />
         </div>
       </div>
 
@@ -439,7 +392,6 @@ export default function EditorPage() {
       <ExportDialog
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
-        canvas={canvasRef.current}
         projectName={project?.name || "design"}
       />
     </>

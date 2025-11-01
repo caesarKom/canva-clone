@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Canvas } from "fabric"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,28 +14,15 @@ import {
 } from "@/components/ui/dialog"
 import { Settings } from "lucide-react"
 import { toast } from "sonner"
+import { useEditorStore } from "@/stores/editor-store"
 
-interface CanvasSettingsProps {
-  canvas: Canvas | null
-  currentWidth: number
-  currentHeight: number
-  onDimensionsChange?: (width: number, height: number) => void
-}
+export function CanvasSettings() {
 
-export function CanvasSettings({
-  canvas,
-  currentWidth,
-  currentHeight,
-  onDimensionsChange,
-}: CanvasSettingsProps) {
-  const [width, setWidth] = useState(currentWidth)
-  const [height, setHeight] = useState(currentHeight)
+  const {canvas, canvasWidth, canvasHeight, setCanvasDimensions} = useEditorStore()
   const [open, setOpen] = useState(false)
+  const [width, setWidth] = useState(canvasWidth)
+  const [height, setHeight] = useState(canvasHeight)
 
-  useEffect(() => {
-    setWidth(currentWidth)
-    setHeight(currentHeight)
-  }, [currentWidth, currentHeight])
 
   const handleApply = () => {
     if (!canvas) {
@@ -45,20 +31,8 @@ export function CanvasSettings({
     }
 
     try {
-      canvas.set({
-        width: width,
-        height: height,
-      })
+      setCanvasDimensions(width,height)
 
-      const canvasElement = canvas.getElement()
-      if (canvasElement) {
-        canvasElement.width = width
-        canvasElement.height = height
-      }
-
-      canvas.renderAll()
-
-      onDimensionsChange?.(width, height)
       toast.success("Canvas size updated")
       setOpen(false)
     } catch (error) {
@@ -83,7 +57,7 @@ export function CanvasSettings({
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Settings className="h-4 w-4 mr-2" />
-          {currentWidth}×{currentHeight}
+          {canvasWidth}×{canvasHeight}
         </Button>
       </DialogTrigger>
       <DialogContent>
