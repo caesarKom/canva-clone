@@ -14,13 +14,11 @@ const loginSchema = z.object({
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: {
-    strategy: "jwt",
-  },
-  pages: {
-    signIn: "/login",
-  },
+  session: { strategy: "jwt"},
+  pages: {signIn: "/login"},
   secret: process.env.NEXTAUTH_SECRET,
+  trustHost: true,
+  
   providers: [
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID!,
