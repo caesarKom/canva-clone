@@ -23,7 +23,7 @@ import {
   ArrowBigRight,
   Check,
 } from "lucide-react"
-import { Line, IText, Color } from "fabric"
+import { Line, IText, Color, Textbox } from "fabric"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { useEditorStore } from "@/stores/editor-store"
@@ -447,6 +447,34 @@ export function SidebarApp() {
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
                           Small text
+                        </div>
+                      </div>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start h-auto p-4"
+                      onClick={() => {
+                        if (canvas) {
+                          const text = new Textbox("Add text box\n • line one\n • line two", {
+                            left: 180,
+                            top: 180,
+                            fontSize: 12,
+                            fill: "#000000",
+                            fontFamily: "Arial",
+                            width: 100,
+                            height: 40
+                          })
+                          canvas.add(text)
+                          canvas.setActiveObject(text)
+                          canvas.renderAll()
+                        }
+                      }}
+                    >
+                      <div className="text-left">
+                        <div className="font-normal text-sm flex flex-col">
+                          <span>Add box text</span>
+                          <span>• line one</span>
+                          <span>• line two</span>
                         </div>
                       </div>
                     </Button>

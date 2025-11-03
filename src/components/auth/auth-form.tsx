@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Github } from "lucide-react"
+import { Github, Palette } from "lucide-react"
 
 export function AuthForm({ mode = "login" }: { mode?: "login" | "register" }) {
   const router = useRouter()
@@ -50,6 +50,12 @@ export function AuthForm({ mode = "login" }: { mode?: "login" | "register" }) {
 
   return (
     <div className="w-full max-w-md space-y-6 border p-20 rounded-xl bg-blue-100/20">
+ 
+        <div className="flex items-center justify-center w-full gap-2">
+          <Palette className="h-6 w-6 text-blue-600" />
+          <span className="text-xl font-bold text-gray-900">DesignStudio</span>
+        </div>
+   
       <form onSubmit={handleSubmit} className="space-y-4 p-6">
         {mode === "register" && (
           <div>

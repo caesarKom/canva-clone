@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef, useCallback, useState } from "react"
 import { Canvas } from "fabric"
 import {
   initializeFabric,
@@ -24,6 +24,7 @@ export function CanvasEditor({
   const localCanvasRef = useRef<HTMLCanvasElement>(null)
   const fabricRef = useRef<Canvas | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [isMounted, setIsMounted] = useState(false)
 
   const {
     canvas,
@@ -35,6 +36,10 @@ export function CanvasEditor({
     saveToHistory,
     autoSaveTime,
   } = useEditorStore()
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const handleSave = useCallback(() => {
     if (fabricRef.current && onSave) {
@@ -62,7 +67,7 @@ export function CanvasEditor({
   }, [autoSaveTime, handleSave])
 
   useEffect(() => {
-    if (!localCanvasRef.current) return
+    if (!isMounted || !localCanvasRef.current) return
 
     const fabricCanvas = initializeFabric(
       localCanvasRef,
@@ -110,7 +115,7 @@ export function CanvasEditor({
       fabricRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId])
+  }, [projectId, isMounted])
 
     const handleZoomIn = () => setZoom(Math.min(zoom + 0.1, 2))
   const handleZoomOut = () => setZoom(Math.max(zoom - 0.1, 0.1))
@@ -161,6 +166,17 @@ export function CanvasEditor({
     
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasWidth, canvasHeight])
+
+  if (!isMounted) {
+    return (
+      <div className="flex-1 bg-gray-100 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="size-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-600">Loading canvas...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

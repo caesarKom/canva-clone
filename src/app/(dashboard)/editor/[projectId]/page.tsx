@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef, useCallback, useState } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Canvas, FabricImage } from "fabric"
 import { CanvasEditor } from "@/components/editor/canvas"
@@ -21,6 +21,7 @@ export default function EditorPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const canvasRef = useRef<Canvas | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
 
   const {
     canvas,
@@ -42,6 +43,10 @@ export default function EditorPage() {
 
   const isCreatingProject = useRef(false)
   const hasInitialized = useRef(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   useEffect(() => {
     if (project?.animations) {
@@ -339,6 +344,10 @@ export default function EditorPage() {
       canvasRef.current = null
     }
   }, [canvas])
+
+  if (!isMounted) {
+    return <Loading />
+  }
 
   return (
     <>
