@@ -101,7 +101,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           <div className="flex items-start justify-between">
             <Link href={`/editor/${project.id}`} className="flex-1 min-w-0">
               <h3 className="font-semibold truncate">{project.name}</h3>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500" suppressHydrationWarning>
                 {new Date(project.updatedAt).toLocaleDateString()}
               </p>
             </Link>

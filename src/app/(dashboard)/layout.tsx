@@ -13,8 +13,8 @@ export default async function DashboardLayout({
   }
 
   return (
-    <>
+    <div suppressHydrationWarning>
       {children}
-    </>
+    </div>
   )
 }
