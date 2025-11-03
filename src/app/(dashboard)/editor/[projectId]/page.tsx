@@ -125,9 +125,12 @@ export default function EditorPage() {
         credentials: "include",
       })
 
-      if (!res.ok) throw new Error("Failed to load project")
+      if (!res.ok) {
+      throw new Error("Failed to load project")
+    }
 
       const data = await res.json()
+
       setProject(data)
 
       // Load animations
@@ -331,9 +334,7 @@ export default function EditorPage() {
       loadProject()
     }
 
-    return () => {
-      reset()
-    }
+  
   }, [createNewProject, loadProject, params.projectId, reset, searchParams])
 
   // ✅ Sync canvas from store to ref (for manual save)
@@ -366,11 +367,13 @@ export default function EditorPage() {
           <SidebarApp />
 
           {project ? (
+            <>
             <CanvasEditor
               projectId={params.projectId as string}
               initialData={project?.canvasData}
               onSave={handleSave}
             />
+            </>
           ) : (
             <Loading />
           )}

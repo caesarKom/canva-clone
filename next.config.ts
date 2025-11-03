@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
     })
     return config
   },
+  // ✅ Disable React strict mode for production canvas issues
+  reactStrictMode: false,
   images: {
     // ✅ Add support for data URI (base64)
     dangerouslyAllowSVG: true,
@@ -21,6 +23,12 @@ const nextConfig: NextConfig = {
     ],
     // ✅ Disable optimization for data URIs
     unoptimized: process.env.NODE_ENV === "development",
+  },
+  // ✅ Compiler options
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
   },
 }
 
