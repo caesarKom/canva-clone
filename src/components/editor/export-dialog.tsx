@@ -87,22 +87,41 @@ export function ExportDialog({ open, onOpenChange, projectName }: ExportDialogPr
     URL.revokeObjectURL(url)
   }
 
-  const exportPDF = (canvas: Canvas, fileName: string) => {
-    const imgData = canvas.toDataURL({
-      format: 'png',
-      quality: 1,
-      multiplier: 2,
-    })
+const exportPDF = (canvas: Canvas, fileName: string) => {
+  const exportMultiplier = 1.5;
+  const imgData = canvas.toDataURL({
+    format: 'jpeg',
+    quality: 1,
+    multiplier: exportMultiplier
+  });
 
-    const pdf = new jsPDF({
-      orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
-      unit: 'px',
-      format: [canvas.width, canvas.height],
-    })
+  const canvasWidth = canvas.getWidth() * exportMultiplier;
+    const canvasHeight = canvas.getHeight() * exportMultiplier;
 
-    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height)
-    pdf.save(`${fileName}.pdf`)
-  }
+  const pdf = new jsPDF({
+    orientation: canvasWidth > canvasHeight ? 'landscape' : 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    
+    // Calculate dimensions while maintaining proportions
+    const scale = Math.min(
+      (pageWidth +1) / canvasWidth,
+      (pageHeight +1) / canvasHeight
+    );
+    
+    const imgWidth = canvasWidth * scale;
+    const imgHeight = canvasHeight * scale;
+
+    const x = (pageWidth - imgWidth) / 2;
+    const y = (pageHeight - imgHeight) / 2;
+
+    pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
+    pdf.save(`${fileName}.pdf`);
+}
 
   const exportJSON = (canvas: Canvas, fileName: string) => {
     const json = JSON.stringify(canvas.toJSON(), null, 2)
